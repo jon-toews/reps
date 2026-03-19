@@ -72,12 +72,30 @@ export function ActiveSession({ session }: ActiveSessionProps) {
   const [editingGym, setEditingGym] = useState(false)
   const [gymInput, setGymInput] = useState(session.gym_tag ?? '')
 
-  const [pendingExercises, setPendingExercises] = useState<Exercise[]>([])
-  const templateInitialized = useRef(false)
+  const storageKey = `pending_exercises_${session.id}`
+  const [pendingExercises, setPendingExercises] = useState<Exercise[]>(() => {
+    try {
+      const saved = sessionStorage.getItem(storageKey)
+      return saved ? (JSON.parse(saved) as Exercise[]) : []
+    } catch {
+      return []
+    }
+  })
+  const templateInitialized = useRef(pendingExercises.length > 0)
   const [activeExerciseId, setActiveExerciseId] = useState<string | null>(null)
   const [exerciseOrderOverride, setExerciseOrderOverride] = useState<string[] | null>(null)
 
   useEffect(() => () => { if (discardTimer.current) clearTimeout(discardTimer.current) }, [])
+
+  useEffect(() => {
+    try {
+      if (pendingExercises.length > 0) {
+        sessionStorage.setItem(storageKey, JSON.stringify(pendingExercises))
+      } else {
+        sessionStorage.removeItem(storageKey)
+      }
+    } catch { /* ignore */ }
+  }, [pendingExercises, storageKey])
 
   // Clear exercise order override when server data updates
   useEffect(() => { setExerciseOrderOverride(null) }, [sets])
@@ -85,7 +103,7 @@ export function ActiveSession({ session }: ActiveSessionProps) {
   const handleDiscard = () => {
     if (discardConfirm) {
       if (discardTimer.current) clearTimeout(discardTimer.current)
-      deleteSession.mutate(session.id, { onSuccess: () => navigate('/') })
+      deleteSession.mutate(session.id, { onSuccess: () => { sessionStorage.removeItem(storageKey); navigate('/') } })
     } else {
       setDiscardConfirm(true)
       discardTimer.current = setTimeout(() => setDiscardConfirm(false), 3000)
@@ -156,6 +174,7 @@ export function ActiveSession({ session }: ActiveSessionProps) {
 
   const handleFinish = async () => {
     await completeSession.mutateAsync(session.id)
+    sessionStorage.removeItem(storageKey)
     navigate('/history')
   }
 
