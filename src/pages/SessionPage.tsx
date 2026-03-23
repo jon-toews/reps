@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useParams } from 'react-router-dom'
+import { useParams, useOutletContext } from 'react-router-dom'
 import { useSession } from '../hooks/useSession'
 import { ActiveSession } from '../components/session/ActiveSession'
 import { VolumeView } from '../components/session/VolumeView'
@@ -8,6 +8,7 @@ export function SessionPage() {
   const { id } = useParams<{ id: string }>()
   const { data: session, isLoading, error } = useSession(id)
   const [showVolume, setShowVolume] = useState(false)
+  const { setSessionActions } = useOutletContext<{ setSessionActions: (actions: any) => void }>()
 
   if (isLoading) {
     return <p className="text-gray-500 text-sm">Loading session…</p>
@@ -37,7 +38,7 @@ export function SessionPage() {
       {showVolume && session.program_id ? (
         <VolumeView session={session} />
       ) : (
-        <ActiveSession session={session} />
+        <ActiveSession session={session} onSetSessionActions={setSessionActions} />
       )}
     </div>
   )

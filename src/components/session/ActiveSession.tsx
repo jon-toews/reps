@@ -54,9 +54,10 @@ function SortableExerciseBlock(props: Omit<ExerciseBlockProps, 'dragHandleProps'
 
 interface ActiveSessionProps {
   session: Session
+  onSetSessionActions?: (actions: { onFinish?: () => void; isCompleted?: boolean }) => void
 }
 
-export function ActiveSession({ session }: ActiveSessionProps) {
+export function ActiveSession({ session, onSetSessionActions }: ActiveSessionProps) {
   const { data: sets = [] } = useSessionSets(session.id)
   const completeSession = useCompleteSession()
   const deleteSession = useDeleteSession()
@@ -71,6 +72,7 @@ export function ActiveSession({ session }: ActiveSessionProps) {
   const discardTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const [editingGym, setEditingGym] = useState(false)
   const [gymInput, setGymInput] = useState(session.gym_tag ?? '')
+  const [keyboardHeight, setKeyboardHeight] = useState(0)
 
   const storageKey = `pending_exercises_${session.id}`
   const [pendingExercises, setPendingExercises] = useState<Exercise[]>(() => {
@@ -86,6 +88,21 @@ export function ActiveSession({ session }: ActiveSessionProps) {
   const [exerciseOrderOverride, setExerciseOrderOverride] = useState<string[] | null>(null)
 
   useEffect(() => () => { if (discardTimer.current) clearTimeout(discardTimer.current) }, [])
+
+  // Detect keyboard height
+  useEffect(() => {
+    if (typeof window !== 'undefined' && 'visualViewport' in window) {
+      const handleViewportResize = () => {
+        const vv = window.visualViewport
+        if (vv) {
+          const keyboardHeight = window.innerHeight - vv.height
+          setKeyboardHeight(Math.max(0, keyboardHeight))
+        }
+      }
+      window.visualViewport?.addEventListener('resize', handleViewportResize)
+      return () => window.visualViewport?.removeEventListener('resize', handleViewportResize)
+    }
+  }, [])
 
   useEffect(() => {
     try {
@@ -178,6 +195,16 @@ export function ActiveSession({ session }: ActiveSessionProps) {
     navigate('/history')
   }
 
+  // Update parent with finish handler
+  useEffect(() => {
+    if (onSetSessionActions) {
+      onSetSessionActions({
+        onFinish: isCompleted ? undefined : handleFinish,
+        isCompleted,
+      })
+    }
+  }, [isCompleted, onSetSessionActions])
+
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
     useSensor(TouchSensor, { activationConstraint: { delay: 250, tolerance: 5 } })
@@ -267,20 +294,13 @@ export function ActiveSession({ session }: ActiveSessionProps) {
             <button
               onClick={handleDiscard}
               disabled={deleteSession.isPending}
-              className={`text-xs px-3 py-1.5 rounded-lg border transition-colors disabled:opacity-50 ${
+              className={`text-xs px-3 py-3 rounded-lg border transition-colors disabled:opacity-50 ${
                 discardConfirm
                   ? 'border-red-700 text-red-400 hover:bg-red-900/30'
                   : 'border-gray-700 text-gray-500 hover:text-gray-300'
               }`}
             >
               {deleteSession.isPending ? '…' : discardConfirm ? 'Confirm?' : 'Discard'}
-            </button>
-            <button
-              onClick={() => void handleFinish()}
-              disabled={completeSession.isPending}
-              className="bg-green-700 hover:bg-green-600 disabled:opacity-50 rounded-xl px-4 py-2 text-sm font-semibold transition-colors"
-            >
-              Finish
             </button>
           </div>
         )}
@@ -348,8 +368,12 @@ export function ActiveSession({ session }: ActiveSessionProps) {
 
       {!isCompleted && (
         <div
-          className="fixed left-1/2 -translate-x-1/2"
-          style={{ bottom: 'max(1.5rem, env(safe-area-inset-bottom))' }}
+          className="fixed left-1/2 -translate-x-1/2 transition-all"
+          style={{
+            bottom: `calc(max(1.5rem, env(safe-area-inset-bottom)) + ${keyboardHeight}px)`,
+            opacity: keyboardHeight > 100 ? 0 : 1,
+            pointerEvents: keyboardHeight > 100 ? 'none' : 'auto',
+          }}
         >
           <button
             onClick={() => setShowPicker(true)}

@@ -1,8 +1,8 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { useDrag } from '@use-gesture/react'
 import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { useAddSet, useUpdateSet, useDeleteSet } from '../../hooks/useSession'
+import { useAddSet, useUpdateSet, useDeleteSet, useSessionSets } from '../../hooks/useSession'
 import type { Exercise, SetWithExercise } from '../../types'
 
 // ── Stepper Button ────────────────────────────────────────────────────────────
@@ -284,11 +284,39 @@ export function TentativeSetRow({
   defaultTags,
 }: TentativeSetRowProps) {
   const addSet = useAddSet()
+  const { data: sessionSets = [] } = useSessionSets(sessionId)
   const [weight, setWeight] = useState(defaultWeight != null ? String(defaultWeight) : '')
   const [repsLeft, setRepsLeft] = useState(defaultReps != null ? String(defaultReps) : '')
   const [repsRight, setRepsRight] = useState(defaultReps != null ? String(defaultReps) : '')
   const [rir, setRir] = useState('')
   const [tags, setTags] = useState(defaultTags.join(', '))
+
+  // Extract recent tags for this exercise from the last N sets
+  const recentTags = useMemo(() => {
+    const tagSet = new Set<string>()
+    const setsForExercise = sessionSets
+      .filter((s) => s.exercise_id === exercise.id)
+      .slice(-10) // Last 10 sets for this exercise
+    for (const set of setsForExercise) {
+      for (const tag of set.tags) {
+        tagSet.add(tag)
+      }
+    }
+    return Array.from(tagSet)
+  }, [sessionSets, exercise.id])
+
+  const toggleTag = (tag: string) => {
+    const currentTags = tags.trim().split(/[\s,]+/).filter(Boolean)
+    const idx = currentTags.indexOf(tag)
+    if (idx >= 0) {
+      currentTags.splice(idx, 1)
+    } else {
+      currentTags.push(tag)
+    }
+    setTags(currentTags.join(', '))
+  }
+
+  const currentTagSet = new Set(tags.trim().split(/[\s,]+/).filter(Boolean))
 
   const increment = exercise.default_weight_increment || 2.5
 
@@ -400,18 +428,35 @@ export function TentativeSetRow({
         </button>
       </div>
 
-      <div className="flex items-center gap-3 px-2">
-        <span className="text-xs text-gray-600">RIR</span>
-        <input
-          type="text"
-          inputMode="numeric"
-          value={rir}
-          onChange={(e) => setRir(e.target.value)}
-          onKeyDown={onKeyDown}
-          placeholder="—"
-          className="w-10 bg-gray-800 rounded-lg text-center text-base py-0.5 focus:outline-none focus:ring-1 focus:ring-blue-500/50 tabular-nums text-gray-400 touch-manipulation"
-          aria-label="RIR"
-        />
+      <div className="flex items-center gap-2 px-2">
+        <span className="text-xs text-gray-600 shrink-0">RIR</span>
+        <div className="flex gap-1">
+          {['0', '1', '2', '3'].map((val) => (
+            <button
+              key={val}
+              type="button"
+              onClick={() => setRir(rir === val ? '' : val)}
+              className={`w-8 h-8 rounded-lg text-xs font-semibold transition-colors touch-manipulation ${
+                rir === val
+                  ? 'bg-blue-600 text-white'
+                  : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
+              }`}
+            >
+              {val}
+            </button>
+          ))}
+          <button
+            type="button"
+            onClick={() => setRir('')}
+            className={`w-8 h-8 rounded-lg text-xs font-semibold transition-colors touch-manipulation ${
+              rir === ''
+                ? 'bg-blue-600 text-white'
+                : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
+            }`}
+          >
+            —
+          </button>
+        </div>
         <span className="text-xs text-gray-600 ml-2">Tags</span>
         <input
           type="text"
@@ -423,6 +468,25 @@ export function TentativeSetRow({
           aria-label="Tags"
         />
       </div>
+
+      {recentTags.length > 0 && (
+        <div className="flex gap-1.5 flex-wrap px-2">
+          {recentTags.map((tag) => (
+            <button
+              key={tag}
+              type="button"
+              onClick={() => toggleTag(tag)}
+              className={`text-xs px-2.5 py-1 rounded-full border transition-colors touch-manipulation ${
+                currentTagSet.has(tag)
+                  ? 'bg-blue-700 border-blue-600 text-blue-100'
+                  : 'bg-gray-700 border-gray-600 hover:bg-gray-600 text-gray-300'
+              }`}
+            >
+              {tag}
+            </button>
+          ))}
+        </div>
+      )}
     </div>
   )
 }
