@@ -1,57 +1,8 @@
 import React, { useEffect, useState } from 'react'
 import { Link, Outlet, useNavigate, useLocation } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
-import { useSession as useSessionHook } from '../../hooks/useSession'
+import { useActiveSession } from '../../hooks/useActiveSession'
 import type { User } from '@supabase/supabase-js'
-
-// ── More Menu Sheet ────────────────────────────────────────────────────────────
-
-interface MoreMenuSheetProps {
-  isOpen: boolean
-  onClose: () => void
-  onSignOut: () => void
-}
-
-function MoreMenuSheet({ isOpen, onClose, onSignOut }: MoreMenuSheetProps) {
-  if (!isOpen) return null
-
-  return (
-    <>
-      <div
-        className="fixed inset-0 z-40 bg-black/60"
-        onClick={onClose}
-      />
-      <div className="fixed bottom-0 left-0 right-0 z-50 bg-gray-900 border-t border-gray-800 rounded-t-2xl p-4 space-y-1 max-h-96 overflow-y-auto"
-        style={{ paddingBottom: 'max(1rem, env(safe-area-inset-bottom))' }}
-      >
-        <div className="flex h-1 bg-gray-700 rounded-full mx-auto mb-4 w-12" />
-        <Link
-          to="/exercises"
-          onClick={onClose}
-          className="block w-full text-left px-4 py-3 rounded-lg text-sm font-medium text-gray-300 hover:bg-gray-800 transition-colors"
-        >
-          Exercises
-        </Link>
-        <Link
-          to="/programs"
-          onClick={onClose}
-          className="block w-full text-left px-4 py-3 rounded-lg text-sm font-medium text-gray-300 hover:bg-gray-800 transition-colors"
-        >
-          Programs
-        </Link>
-        <button
-          onClick={() => {
-            onSignOut()
-            onClose()
-          }}
-          className="w-full text-left px-4 py-3 rounded-lg text-sm font-medium text-gray-300 hover:bg-gray-800 transition-colors"
-        >
-          Sign out
-        </button>
-      </div>
-    </>
-  )
-}
 
 // Context for session actions
 export const SessionActionContext = React.createContext<{
@@ -59,25 +10,55 @@ export const SessionActionContext = React.createContext<{
   onDiscard?: () => void
 } | null>(null)
 
+// ── Icons ──────────────────────────────────────────────────────────────────────
+
+function IconHome({ className }: { className?: string }) {
+  return (
+    <svg className={className} width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M3 12l9-8 9 8" />
+      <path d="M5 10v10h5v-6h4v6h5V10" />
+    </svg>
+  )
+}
+
+function IconBarbell({ className }: { className?: string }) {
+  return (
+    <svg className={className} width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M2 12h20" />
+      <rect x="4" y="8" width="3" height="8" rx="1" />
+      <rect x="17" y="8" width="3" height="8" rx="1" />
+      <rect x="1" y="10" width="2" height="4" rx="0.5" />
+      <rect x="21" y="10" width="2" height="4" rx="0.5" />
+    </svg>
+  )
+}
+
+function IconSetup({ className }: { className?: string }) {
+  return (
+    <svg className={className} width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z" />
+      <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z" />
+    </svg>
+  )
+}
+
 // ── Tab Bar ────────────────────────────────────────────────────────────────────
 
 interface TabBarProps {
-  onMoreOpen: () => void
   activeSessionId: string | null
   onFinish?: () => void
   isSessionCompleted?: boolean
 }
 
-function TabBar({ onMoreOpen, activeSessionId, onFinish, isSessionCompleted }: TabBarProps) {
+function TabBar({ activeSessionId, onFinish, isSessionCompleted }: TabBarProps) {
   const location = useLocation()
   const isHome = location.pathname === '/'
   const isSession = location.pathname.startsWith('/session/')
-  const isHistory = location.pathname === '/history'
+  const isSetup = location.pathname === '/setup'
 
   const handleSessionClick = (e: React.MouseEvent<HTMLAnchorElement>) => {
     if (!activeSessionId) {
       e.preventDefault()
-      return
     }
   }
 
@@ -86,7 +67,7 @@ function TabBar({ onMoreOpen, activeSessionId, onFinish, isSessionCompleted }: T
 
   return (
     <nav
-      className={`fixed bottom-0 left-0 right-0 z-40 border-t border-gray-800 bg-gray-900 flex items-center ${
+      className={`fixed bottom-0 left-0 right-0 z-40 border-t border-gray-800 bg-gray-950/95 backdrop-blur-sm flex items-center ${
         showFinishBtn ? 'justify-between px-3' : 'justify-around'
       }`}
       style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
@@ -94,45 +75,34 @@ function TabBar({ onMoreOpen, activeSessionId, onFinish, isSessionCompleted }: T
       <div className="flex items-center justify-around flex-1">
         <Link
           to="/"
-          className={`flex-1 flex items-center justify-center h-14 text-lg transition-colors ${
+          className={`flex-1 flex items-center justify-center h-12 transition-colors ${
             isHome ? 'text-blue-500' : 'text-gray-500 hover:text-gray-300'
           }`}
-          title="Home"
         >
-          🏠
+          <IconHome />
         </Link>
 
         <Link
-          to={activeSessionId ? `/session/${activeSessionId}` : '/'}
+          to={activeSessionId ? `/session/${activeSessionId}` : '#'}
           onClick={handleSessionClick}
-          className={`flex-1 flex items-center justify-center h-14 relative transition-colors ${
+          className={`flex-1 flex items-center justify-center h-12 relative transition-colors ${
             isSession ? 'text-blue-500' : activeSessionId ? 'text-gray-500 hover:text-gray-300' : 'text-gray-700 cursor-not-allowed'
           }`}
-          title="Active Session"
         >
-          <span className="text-lg">💪</span>
+          <IconBarbell />
           {activeSessionId && (
-            <span className="absolute top-2 right-2 w-2 h-2 bg-green-500 rounded-full" />
+            <span className="absolute top-1.5 right-3 w-2 h-2 bg-green-500 rounded-full" />
           )}
         </Link>
 
         <Link
-          to="/history"
-          className={`flex-1 flex items-center justify-center h-14 text-lg transition-colors ${
-            isHistory ? 'text-blue-500' : 'text-gray-500 hover:text-gray-300'
+          to="/setup"
+          className={`flex-1 flex items-center justify-center h-12 transition-colors ${
+            isSetup ? 'text-blue-500' : 'text-gray-500 hover:text-gray-300'
           }`}
-          title="History"
         >
-          📊
+          <IconSetup />
         </Link>
-
-        <button
-          onClick={onMoreOpen}
-          className="flex-1 flex items-center justify-center h-14 text-lg text-gray-500 hover:text-gray-300 transition-colors"
-          title="More"
-        >
-          ⋯
-        </button>
       </div>
 
       {showFinishBtn && (
@@ -153,16 +123,12 @@ export function AppShell() {
   const [user, setUser] = useState<User | null>(null)
   const [loading, setLoading] = useState(true)
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
-  const [showMoreMenu, setShowMoreMenu] = useState(false)
   const [sessionActions, setSessionActions] = useState<{ onFinish?: () => void; isCompleted?: boolean } | null>(null)
   const navigate = useNavigate()
-  const location = useLocation()
 
-  // Get active session status
-  const sessionIdMatch = location.pathname.match(/\/session\/([a-zA-Z0-9-]+)/)
-  const sessionId = sessionIdMatch?.[1]
-  const { data: currentSession } = useSessionHook(sessionId || '')
-  const activeSessionId = currentSession && !currentSession.ended_at ? currentSession.id : null
+  // Global active session query — works regardless of current page
+  const { data: activeSession } = useActiveSession()
+  const activeSessionId = activeSession?.id ?? null
 
   useEffect(() => {
     const handler = (e: Event) => {
@@ -206,30 +172,30 @@ export function AppShell() {
     <SessionActionContext.Provider value={sessionActions}>
       <div className="min-h-screen flex flex-col bg-gray-950">
         <header className="border-b border-gray-800 bg-gray-900 sticky top-0 z-30">
-          <div className="max-w-2xl mx-auto px-4 h-14 flex items-center">
+          <div className="max-w-2xl mx-auto px-4 h-14 flex items-center justify-between">
             <Link to="/" className="font-bold text-lg tracking-tight text-white">
               LiftTrack
             </Link>
+            <button
+              onClick={handleSignOut}
+              className="text-xs text-gray-500 hover:text-gray-300 transition-colors"
+            >
+              Sign out
+            </button>
           </div>
         </header>
-        <main className="flex-1 max-w-2xl mx-auto w-full px-4 py-6 pb-24">
+        <main className="flex-1 max-w-2xl mx-auto w-full px-4 py-6 pb-20">
           <Outlet context={{ setSessionActions }} />
         </main>
 
         <TabBar
-          onMoreOpen={() => setShowMoreMenu(true)}
           activeSessionId={activeSessionId}
           onFinish={sessionActions?.onFinish}
           isSessionCompleted={sessionActions?.isCompleted}
         />
-        <MoreMenuSheet
-          isOpen={showMoreMenu}
-          onClose={() => setShowMoreMenu(false)}
-          onSignOut={handleSignOut}
-        />
 
         {errorMsg && (
-          <div className="fixed bottom-24 left-1/2 -translate-x-1/2 z-50 max-w-sm w-full px-4">
+          <div className="fixed bottom-16 left-1/2 -translate-x-1/2 z-50 max-w-sm w-full px-4">
             <div className="bg-red-900 border border-red-700 rounded-xl px-4 py-3 text-sm text-red-200 shadow-lg">
               {errorMsg}
             </div>

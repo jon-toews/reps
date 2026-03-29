@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 
 type Mode = 'email' | 'otp' | 'password'
@@ -11,6 +12,7 @@ export function LoginPage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [usePassword, setUsePassword] = useState(false)
+  const navigate = useNavigate()
 
   const handleSendOtp = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -38,14 +40,13 @@ export function LoginPage() {
     e.preventDefault()
     setLoading(true)
     setError(null)
-    // Try 'email' first (existing user), then 'signup' (new user).
-    // Failed attempts don't invalidate the token.
-    const { error: emailError } = await supabase.auth.verifyOtp({
+    // Try 'magiclink' first (existing user OTP), then 'signup' (new user).
+    const { error: mlError } = await supabase.auth.verifyOtp({
       email,
       token: otp,
-      type: 'email',
+      type: 'magiclink',
     })
-    if (emailError) {
+    if (mlError) {
       const { error: signupError } = await supabase.auth.verifyOtp({
         email,
         token: otp,
@@ -54,9 +55,12 @@ export function LoginPage() {
       setLoading(false)
       if (signupError) {
         setError(signupError.message)
+      } else {
+        navigate('/', { replace: true })
       }
     } else {
       setLoading(false)
+      navigate('/', { replace: true })
     }
   }
 
@@ -78,6 +82,8 @@ export function LoginPage() {
         setLoading(false)
         if (signUpError) {
           setError(signUpError.message)
+        } else {
+          navigate('/', { replace: true })
         }
       } else {
         setLoading(false)
@@ -85,6 +91,7 @@ export function LoginPage() {
       }
     } else {
       setLoading(false)
+      navigate('/', { replace: true })
     }
   }
 

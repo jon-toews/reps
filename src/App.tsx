@@ -6,7 +6,7 @@ import { SessionPage } from './pages/SessionPage'
 import { HistoryPage } from './pages/HistoryPage'
 import { ExercisesPage } from './pages/ExercisesPage'
 import { ExerciseHistoryPage } from './pages/ExerciseHistoryPage'
-import { ProgramPage } from './pages/ProgramPage'
+import { SetupPage } from './pages/SetupPage'
 
 export function App() {
   return (
@@ -18,7 +18,7 @@ export function App() {
         <Route path="/history" element={<HistoryPage />} />
         <Route path="/exercises" element={<ExercisesPage />} />
         <Route path="/exercises/:id" element={<ExerciseHistoryPage />} />
-        <Route path="/programs" element={<ProgramPage />} />
+        <Route path="/setup" element={<SetupPage />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

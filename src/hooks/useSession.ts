@@ -99,6 +99,7 @@ export function useCreateSession() {
     },
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ['recentSessions'] })
+      void qc.invalidateQueries({ queryKey: ['activeSession'] })
     },
   })
 }
@@ -119,6 +120,7 @@ export function useCompleteSession() {
     onSuccess: (_data, sessionId) => {
       void qc.invalidateQueries({ queryKey: ['session', sessionId] })
       void qc.invalidateQueries({ queryKey: ['recentSessions'] })
+      void qc.invalidateQueries({ queryKey: ['activeSession'] })
     },
   })
 }
@@ -215,6 +217,7 @@ export function useDeleteSession() {
     },
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ['recentSessions'] })
+      void qc.invalidateQueries({ queryKey: ['activeSession'] })
     },
   })
 }
