@@ -38,14 +38,25 @@ export function LoginPage() {
     e.preventDefault()
     setLoading(true)
     setError(null)
-    const { error } = await supabase.auth.verifyOtp({
+    // Try 'email' first (existing user), then 'signup' (new user).
+    // Failed attempts don't invalidate the token.
+    const { error: emailError } = await supabase.auth.verifyOtp({
       email,
       token: otp,
       type: 'email',
     })
-    setLoading(false)
-    if (error) {
-      setError(error.message)
+    if (emailError) {
+      const { error: signupError } = await supabase.auth.verifyOtp({
+        email,
+        token: otp,
+        type: 'signup',
+      })
+      setLoading(false)
+      if (signupError) {
+        setError(signupError.message)
+      }
+    } else {
+      setLoading(false)
     }
   }
 
