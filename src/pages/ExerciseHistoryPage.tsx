@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
+import { useParams, useNavigate, useLocation } from 'react-router-dom'
 import { useExercises } from '../hooks/useExercises'
 import { useExerciseHistory } from '../hooks/useExerciseHistory'
 import type { HistorySet } from '../hooks/useExerciseHistory'
@@ -70,10 +70,12 @@ function canonicalReps(set: HistorySet): number | null {
 export function ExerciseHistoryPage() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
+  const location = useLocation()
   const { data: exercises = [] } = useExercises()
   const { data: sets = [], isLoading } = useExerciseHistory(id)
 
   const exercise = exercises.find((e) => e.id === id)
+  const backTo = (location.state as { from?: string } | null)?.from
 
   // Filter state
   const [gymFilter, setGymFilter] = useState<string>('all')
@@ -107,10 +109,10 @@ export function ExerciseHistoryPage() {
     <div className="space-y-5 pb-16">
       <div className="flex items-center gap-3">
         <button
-          onClick={() => navigate('/exercises')}
+          onClick={() => navigate(backTo ?? '/exercises')}
           className="text-gray-500 hover:text-white text-sm transition-colors"
         >
-          ← Exercises
+          ← {backTo ? 'Session' : 'Exercises'}
         </button>
         {exercise && (
           <div>

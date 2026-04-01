@@ -217,7 +217,7 @@ export function ConfirmedSetRow({
           onChange={(e) => setRir(e.target.value)}
           onBlur={save}
           disabled={sessionCompleted}
-          className={`${inputCls} ml-auto w-8 text-gray-500 text-sm`}
+          className={`${inputCls} ml-auto w-8 text-gray-500`}
           placeholder="RIR"
           aria-label="RIR"
         />
@@ -457,14 +457,17 @@ export function TentativeSetRow({
             —
           </button>
         </div>
-        <span className="text-xs text-gray-600 ml-2">Tags</span>
+      </div>
+
+      <div className="flex items-center gap-2 px-2">
+        <span className="text-xs text-gray-600 shrink-0">Tags</span>
         <input
           type="text"
           value={tags}
           onChange={(e) => setTags(e.target.value)}
           onKeyDown={onKeyDown}
           placeholder="e.g. paused, close-grip"
-          className="flex-1 bg-gray-800 rounded-lg text-sm px-2 py-0.5 focus:outline-none focus:ring-1 focus:ring-blue-500/50 text-gray-400 touch-manipulation"
+          className="flex-1 min-w-0 bg-gray-800 rounded-lg text-base px-2 py-0.5 focus:outline-none focus:ring-1 focus:ring-blue-500/50 text-gray-400 touch-manipulation"
           aria-label="Tags"
         />
       </div>

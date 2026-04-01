@@ -184,7 +184,7 @@ export function AppShell() {
             </button>
           </div>
         </header>
-        <main className="flex-1 max-w-2xl mx-auto w-full px-4 py-6 pb-20">
+        <main className="flex-1 max-w-2xl mx-auto w-full px-4 py-6" style={{ paddingBottom: 'calc(5rem + env(safe-area-inset-bottom))' }}>
           <Outlet context={{ setSessionActions }} />
         </main>
 

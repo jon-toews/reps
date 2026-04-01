@@ -61,7 +61,7 @@ export function ExerciseForm({ exercise, onDone }: ExerciseFormProps) {
     }
   }
 
-  const inputCls = 'w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-500'
+  const inputCls = 'w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-base focus:outline-none focus:border-blue-500'
   const labelCls = 'block text-xs text-gray-400 mb-1'
 
   return (
@@ -73,7 +73,6 @@ export function ExerciseForm({ exercise, onDone }: ExerciseFormProps) {
           type="text"
           placeholder="Exercise name"
           className={inputCls}
-          autoFocus
         />
         {errors.name && <p className="text-red-400 text-xs mt-1">{errors.name.message}</p>}
       </div>

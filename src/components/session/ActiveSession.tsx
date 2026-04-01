@@ -252,7 +252,7 @@ export function ActiveSession({ session, onSetSessionActions }: ActiveSessionPro
                     onBlur={saveGymTag}
                     onKeyDown={(e) => { if (e.key === 'Enter') saveGymTag() }}
                     placeholder="Gym tag"
-                    className="bg-gray-800 rounded-lg px-2 py-0.5 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500/50 text-gray-300 w-40 touch-manipulation"
+                    className="bg-gray-800 rounded-lg px-2 py-0.5 text-base focus:outline-none focus:ring-1 focus:ring-blue-500/50 text-gray-300 w-40 touch-manipulation"
                     aria-label="Gym tag"
                   />
                   {recentGymTags.length > 0 && (
