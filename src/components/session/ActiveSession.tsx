@@ -77,7 +77,7 @@ export function ActiveSession({ session, onSetSessionActions }: ActiveSessionPro
   const storageKey = `pending_exercises_${session.id}`
   const [pendingExercises, setPendingExercises] = useState<Exercise[]>(() => {
     try {
-      const saved = sessionStorage.getItem(storageKey)
+      const saved = localStorage.getItem(storageKey)
       return saved ? (JSON.parse(saved) as Exercise[]) : []
     } catch {
       return []
@@ -107,9 +107,9 @@ export function ActiveSession({ session, onSetSessionActions }: ActiveSessionPro
   useEffect(() => {
     try {
       if (pendingExercises.length > 0) {
-        sessionStorage.setItem(storageKey, JSON.stringify(pendingExercises))
+        localStorage.setItem(storageKey, JSON.stringify(pendingExercises))
       } else {
-        sessionStorage.removeItem(storageKey)
+        localStorage.removeItem(storageKey)
       }
     } catch { /* ignore */ }
   }, [pendingExercises, storageKey])
@@ -120,7 +120,7 @@ export function ActiveSession({ session, onSetSessionActions }: ActiveSessionPro
   const handleDiscard = () => {
     if (discardConfirm) {
       if (discardTimer.current) clearTimeout(discardTimer.current)
-      deleteSession.mutate(session.id, { onSuccess: () => { sessionStorage.removeItem(storageKey); navigate('/') } })
+      deleteSession.mutate(session.id, { onSuccess: () => { localStorage.removeItem(storageKey); navigate('/') } })
     } else {
       setDiscardConfirm(true)
       discardTimer.current = setTimeout(() => setDiscardConfirm(false), 3000)
@@ -191,7 +191,7 @@ export function ActiveSession({ session, onSetSessionActions }: ActiveSessionPro
 
   const handleFinish = async () => {
     await completeSession.mutateAsync(session.id)
-    sessionStorage.removeItem(storageKey)
+    localStorage.removeItem(storageKey)
     navigate('/history')
   }
 
@@ -370,7 +370,7 @@ export function ActiveSession({ session, onSetSessionActions }: ActiveSessionPro
         <div
           className="fixed left-1/2 -translate-x-1/2 transition-all"
           style={{
-            bottom: `calc(max(1.5rem, env(safe-area-inset-bottom)) + ${keyboardHeight}px)`,
+            bottom: `calc(3.5rem + env(safe-area-inset-bottom) + ${keyboardHeight}px)`,
             opacity: keyboardHeight > 100 ? 0 : 1,
             pointerEvents: keyboardHeight > 100 ? 'none' : 'auto',
           }}
