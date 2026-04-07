@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useDrag } from '@use-gesture/react'
 import { useExercises, useCreateExercise } from '../../hooks/useExercises'
 import type { Exercise } from '../../types'
@@ -17,6 +17,18 @@ export function ExercisePicker({ onSelect, onClose, alreadyAdded }: ExercisePick
   const [search, setSearch] = useState('')
   const [sheetY, setSheetY] = useState(0)
   const [settling, setSettling] = useState(false)
+  const [keyboardHeight, setKeyboardHeight] = useState(0)
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || !('visualViewport' in window)) return
+    const handleResize = () => {
+      const vv = window.visualViewport
+      if (vv) setKeyboardHeight(Math.max(0, window.innerHeight - vv.height))
+    }
+    handleResize()
+    window.visualViewport?.addEventListener('resize', handleResize)
+    return () => window.visualViewport?.removeEventListener('resize', handleResize)
+  }, [])
 
   const searchLower = search.toLowerCase()
   const trimmedSearch = search.trim()
@@ -66,8 +78,10 @@ export function ExercisePicker({ onSelect, onClose, alreadyAdded }: ExercisePick
         onClick={onClose}
       />
       <div
-        className="relative z-10 w-full max-w-md bg-gray-900 rounded-t-2xl sm:rounded-2xl border border-gray-800 shadow-2xl max-h-[75vh] flex flex-col"
+        className="relative z-10 w-full max-w-md bg-gray-900 rounded-t-2xl sm:rounded-2xl border border-gray-800 shadow-2xl flex flex-col"
         style={{
+          maxHeight: keyboardHeight > 0 ? `calc(100vh - ${keyboardHeight}px - 1rem)` : '75vh',
+          marginBottom: keyboardHeight > 0 ? `${keyboardHeight}px` : undefined,
           transform: `translateY(${sheetY}px)`,
           transition: settling ? 'transform 0.25s cubic-bezier(0.25, 0.46, 0.45, 0.94)' : 'none',
         }}
