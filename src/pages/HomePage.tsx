@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useRecentSessions, useCreateSession, useSessionsExercises } from '../hooks/useSession'
 import { usePrograms } from '../hooks/usePrograms'
@@ -17,11 +17,30 @@ function NewSessionModal({ onConfirm, onClose, isPending }: NewSessionModalProps
   const { data: programs = [], isLoading: programsLoading } = usePrograms()
   const [selectedProgram, setSelectedProgram] = useState<Program | null>(null)
   const [gymTag, setGymTag] = useState('')
+  const [keyboardHeight, setKeyboardHeight] = useState(0)
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || !('visualViewport' in window)) return
+    const handleResize = () => {
+      const vv = window.visualViewport
+      if (vv) setKeyboardHeight(Math.max(0, window.innerHeight - vv.height))
+    }
+    handleResize()
+    window.visualViewport?.addEventListener('resize', handleResize)
+    return () => window.visualViewport?.removeEventListener('resize', handleResize)
+  }, [])
 
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
       <div className="absolute inset-0 bg-black/60" onClick={onClose} />
-      <div className="relative z-10 w-full max-w-sm bg-gray-900 rounded-t-2xl sm:rounded-2xl border border-gray-800 shadow-2xl p-5 space-y-4">
+      <div
+        className="relative z-10 w-full max-w-sm bg-gray-900 rounded-t-2xl sm:rounded-2xl border border-gray-800 shadow-2xl p-5 space-y-4"
+        style={{
+          maxHeight: keyboardHeight > 0 ? `calc(100vh - ${keyboardHeight}px - 1rem)` : undefined,
+          marginBottom: keyboardHeight > 0 ? `${keyboardHeight}px` : undefined,
+          overflow: keyboardHeight > 0 ? 'auto' : undefined,
+        }}
+      >
         <h2 className="font-semibold text-base">New Session</h2>
 
         <div>
