@@ -20,10 +20,11 @@ import {
   useRecentSessions,
 } from '../../hooks/useSession'
 import { useExercises } from '../../hooks/useExercises'
+import { usePrograms } from '../../hooks/usePrograms'
 import { ExerciseBlock } from './ExerciseBlock'
 import type { ExerciseBlockProps } from './ExerciseBlock'
 import { ExercisePicker } from './ExercisePicker'
-import type { Session, Exercise, SetWithExercise } from '../../types'
+import type { Session, Exercise, SetWithExercise, Program } from '../../types'
 
 // ── Sortable Exercise Block wrapper ───────────────────────────────────────────
 
@@ -67,7 +68,9 @@ export function ActiveSession({ session, onSetSessionActions }: ActiveSessionPro
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const { data: allExercises = [] } = useExercises()
+  const { data: programs = [] } = usePrograms()
   const [showPicker, setShowPicker] = useState(false)
+  const [showTemplatePicker, setShowTemplatePicker] = useState(false)
   const [discardConfirm, setDiscardConfirm] = useState(false)
   const discardTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const [editingGym, setEditingGym] = useState(false)
@@ -125,6 +128,21 @@ export function ActiveSession({ session, onSetSessionActions }: ActiveSessionPro
       setDiscardConfirm(true)
       discardTimer.current = setTimeout(() => setDiscardConfirm(false), 3000)
     }
+  }
+
+  const handleSwapTemplate = (program: Program) => {
+    setShowTemplatePicker(false)
+    // Exercises that already have sets — keep these
+    const exercisesWithSets = new Set(sets.map((s) => s.exercise_id))
+    // Resolve program exercises to full Exercise objects
+    const newPending = program.exercise_order
+      .filter((id) => !exercisesWithSets.has(id))
+      .flatMap((id) => {
+        const ex = allExercises.find((e) => e.id === id)
+        return ex ? [ex] : []
+      })
+    setPendingExercises(newPending)
+    if (newPending.length > 0) setActiveExerciseId(newPending[0].id)
   }
 
   const isCompleted = !!session.ended_at
@@ -291,6 +309,18 @@ export function ActiveSession({ session, onSetSessionActions }: ActiveSessionPro
 
         {!isCompleted && (
           <div className="flex items-center gap-2 shrink-0">
+            {programs.length > 0 && (
+              <button
+                onClick={() => setShowTemplatePicker(!showTemplatePicker)}
+                className={`text-xs px-3 py-3 rounded-lg border transition-colors ${
+                  showTemplatePicker
+                    ? 'border-blue-600 text-blue-400'
+                    : 'border-gray-700 text-gray-500 hover:text-gray-300'
+                }`}
+              >
+                Template
+              </button>
+            )}
             <button
               onClick={handleDiscard}
               disabled={deleteSession.isPending}
@@ -306,7 +336,30 @@ export function ActiveSession({ session, onSetSessionActions }: ActiveSessionPro
         )}
       </div>
 
-      {effectiveExerciseOrder.length === 0 && filteredPending.length === 0 && (
+      {showTemplatePicker && (
+        <div className="rounded-xl border border-gray-800 bg-gray-900 overflow-hidden">
+          <div className="px-4 py-2 border-b border-gray-800">
+            <p className="text-xs text-gray-500">Swap pending exercises with a program</p>
+          </div>
+          <div className="max-h-48 overflow-y-auto">
+            {programs.map((p) => (
+              <button
+                key={p.id}
+                type="button"
+                onClick={() => handleSwapTemplate(p)}
+                className="w-full text-left px-4 py-3 hover:bg-gray-800 transition-colors border-b border-gray-800/50 last:border-0"
+              >
+                <p className="text-sm font-medium">{p.name}</p>
+                <p className="text-xs text-gray-500 mt-0.5">
+                  {p.exercise_order.length} exercise{p.exercise_order.length !== 1 ? 's' : ''}
+                </p>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {effectiveExerciseOrder.length === 0 && filteredPending.length === 0 && !showTemplatePicker && (
         <div className="text-center py-16 text-gray-500">
           <p className="text-lg">No exercises yet</p>
           <p className="text-sm mt-1">Tap the button below to add your first exercise</p>

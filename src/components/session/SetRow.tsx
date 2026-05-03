@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useDrag } from '@use-gesture/react'
 import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
@@ -53,9 +53,9 @@ export function ConfirmedSetRow({
 
   const isUnilateral = set.exercise.is_unilateral
 
-  const [weight, setWeight] = useState(set.weight != null ? String(set.weight) : '')
-  const [repsLeft, setRepsLeft] = useState(set.reps_left != null ? String(set.reps_left) : '')
-  const [repsRight, setRepsRight] = useState(set.reps_right != null ? String(set.reps_right) : '')
+  const [weight, setUserWeight] = useState(set.weight != null ? String(set.weight) : '')
+  const [repsLeft, setUserRepsLeft] = useState(set.reps_left != null ? String(set.reps_left) : '')
+  const [repsRight, setUserRepsRight] = useState(set.reps_right != null ? String(set.reps_right) : '')
   const [rir, setRir] = useState(set.rir != null ? String(set.rir) : '')
   const [offsetX, setOffsetX] = useState(0)
   const [settling, setSettling] = useState(false)
@@ -153,7 +153,7 @@ export function ConfirmedSetRow({
           type="text"
           inputMode="decimal"
           value={weight}
-          onChange={(e) => setWeight(e.target.value)}
+          onChange={(e) => setUserWeight(e.target.value)}
           onBlur={save}
           disabled={sessionCompleted}
           className={`${inputCls} w-14`}
@@ -168,7 +168,7 @@ export function ConfirmedSetRow({
               type="text"
               inputMode="numeric"
               value={repsLeft}
-              onChange={(e) => setRepsLeft(e.target.value)}
+              onChange={(e) => setUserRepsLeft(e.target.value)}
               onBlur={save}
               disabled={sessionCompleted}
               className={`${inputCls} w-8`}
@@ -180,7 +180,7 @@ export function ConfirmedSetRow({
               type="text"
               inputMode="numeric"
               value={repsRight}
-              onChange={(e) => setRepsRight(e.target.value)}
+              onChange={(e) => setUserRepsRight(e.target.value)}
               onBlur={save}
               disabled={sessionCompleted}
               className={`${inputCls} w-8`}
@@ -195,7 +195,7 @@ export function ConfirmedSetRow({
               type="text"
               inputMode="numeric"
               value={repsLeft}
-              onChange={(e) => setRepsLeft(e.target.value)}
+              onChange={(e) => setUserRepsLeft(e.target.value)}
               onBlur={save}
               disabled={sessionCompleted}
               className={`${inputCls} w-10`}
@@ -285,11 +285,16 @@ export function TentativeSetRow({
 }: TentativeSetRowProps) {
   const addSet = useAddSet()
   const { data: sessionSets = [] } = useSessionSets(sessionId)
-  const [weight, setWeight] = useState(defaultWeight != null ? String(defaultWeight) : '')
-  const [repsLeft, setRepsLeft] = useState(defaultReps != null ? String(defaultReps) : '')
-  const [repsRight, setRepsRight] = useState(defaultReps != null ? String(defaultReps) : '')
+  // null = user hasn't touched the field yet → derive display value from default prop
+  const [userWeight, setUserWeight] = useState<string | null>(null)
+  const [userRepsLeft, setUserRepsLeft] = useState<string | null>(null)
+  const [userRepsRight, setUserRepsRight] = useState<string | null>(null)
   const [rir, setRir] = useState('')
   const [tags, setTags] = useState(defaultTags.join(', '))
+
+  const weight = userWeight ?? (defaultWeight != null ? String(defaultWeight) : '')
+  const repsLeft = userRepsLeft ?? (defaultReps != null ? String(defaultReps) : '')
+  const repsRight = userRepsRight ?? (defaultReps != null ? String(defaultReps) : '')
 
   // Extract recent tags for this exercise from the last N sets
   const recentTags = useMemo(() => {
@@ -321,7 +326,7 @@ export function TentativeSetRow({
   const increment = exercise.default_weight_increment || 2.5
 
   const adjust = (
-    setter: React.Dispatch<React.SetStateAction<string>>,
+    setter: React.Dispatch<React.SetStateAction<string | null>>,
     current: string,
     delta: number,
     min = 0
@@ -352,31 +357,31 @@ export function TentativeSetRow({
   return (
     <div className="mt-3 space-y-2">
       <div className="flex items-center gap-1.5 px-2 py-2 rounded-2xl border border-dashed border-gray-700 bg-gray-900/60 flex-wrap">
-        <StepBtn onClick={() => adjust(setWeight, weight, -increment)} label="Decrease weight">−</StepBtn>
+        <StepBtn onClick={() => adjust(setUserWeight, weight, -increment)} label="Decrease weight">−</StepBtn>
         <input
           type="text"
           inputMode="decimal"
           value={weight}
-          onChange={(e) => setWeight(e.target.value)}
+          onChange={(e) => setUserWeight(e.target.value)}
           onKeyDown={onKeyDown}
           placeholder="0"
           className="w-14 bg-transparent text-center text-base font-semibold focus:outline-none tabular-nums caret-blue-400 touch-manipulation"
           aria-label="Weight lb"
         />
-        <StepBtn onClick={() => adjust(setWeight, weight, increment)} label="Increase weight">+</StepBtn>
+        <StepBtn onClick={() => adjust(setUserWeight, weight, increment)} label="Increase weight">+</StepBtn>
 
         <span className="text-gray-600 text-xs px-0.5 shrink-0">lb ×</span>
 
         {exercise.is_unilateral ? (
           <>
-            <StepBtn onClick={() => adjust(setRepsLeft, repsLeft, -1)} label="Decrease reps left">−</StepBtn>
+            <StepBtn onClick={() => adjust(setUserRepsLeft, repsLeft, -1)} label="Decrease reps left">−</StepBtn>
             <input
               type="text"
               inputMode="numeric"
               value={repsLeft}
               onChange={(e) => {
-                setRepsLeft(e.target.value)
-                setRepsRight(e.target.value) // right mirrors left by default
+                setUserRepsLeft(e.target.value)
+                setUserRepsRight(e.target.value) // right mirrors left by default
               }}
               onKeyDown={onKeyDown}
               placeholder="0"
@@ -384,36 +389,36 @@ export function TentativeSetRow({
               aria-label="Reps left"
               autoFocus
             />
-            <StepBtn onClick={() => adjust(setRepsLeft, repsLeft, 1)} label="Increase reps left">+</StepBtn>
+            <StepBtn onClick={() => adjust(setUserRepsLeft, repsLeft, 1)} label="Increase reps left">+</StepBtn>
             <span className="text-gray-600 text-xs">/</span>
-            <StepBtn onClick={() => adjust(setRepsRight, repsRight, -1)} label="Decrease reps right">−</StepBtn>
+            <StepBtn onClick={() => adjust(setUserRepsRight, repsRight, -1)} label="Decrease reps right">−</StepBtn>
             <input
               type="text"
               inputMode="numeric"
               value={repsRight}
-              onChange={(e) => setRepsRight(e.target.value)}
+              onChange={(e) => setUserRepsRight(e.target.value)}
               onKeyDown={onKeyDown}
               placeholder="0"
               className="w-8 bg-transparent text-center text-base font-semibold focus:outline-none tabular-nums caret-blue-400 touch-manipulation"
               aria-label="Reps right"
             />
-            <StepBtn onClick={() => adjust(setRepsRight, repsRight, 1)} label="Increase reps right">+</StepBtn>
+            <StepBtn onClick={() => adjust(setUserRepsRight, repsRight, 1)} label="Increase reps right">+</StepBtn>
           </>
         ) : (
           <>
-            <StepBtn onClick={() => adjust(setRepsLeft, repsLeft, -1)} label="Decrease reps">−</StepBtn>
+            <StepBtn onClick={() => adjust(setUserRepsLeft, repsLeft, -1)} label="Decrease reps">−</StepBtn>
             <input
               type="text"
               inputMode="numeric"
               value={repsLeft}
-              onChange={(e) => setRepsLeft(e.target.value)}
+              onChange={(e) => setUserRepsLeft(e.target.value)}
               onKeyDown={onKeyDown}
               placeholder="0"
               className="w-10 bg-transparent text-center text-base font-semibold focus:outline-none tabular-nums caret-blue-400 touch-manipulation"
               aria-label="Reps"
               autoFocus
             />
-            <StepBtn onClick={() => adjust(setRepsLeft, repsLeft, 1)} label="Increase reps">+</StepBtn>
+            <StepBtn onClick={() => adjust(setUserRepsLeft, repsLeft, 1)} label="Increase reps">+</StepBtn>
           </>
         )}
 

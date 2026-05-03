@@ -70,6 +70,13 @@ export function useCreateSession() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) throw new Error('Not authenticated')
 
+      // Auto-close any open sessions
+      await supabase
+        .from('sessions')
+        .update({ ended_at: new Date().toISOString() })
+        .eq('user_id', user.id)
+        .is('ended_at', null)
+
       const { data: session, error: sessionErr } = await supabase
         .from('sessions')
         .insert({

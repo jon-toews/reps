@@ -1,12 +1,15 @@
 import { useNavigate } from 'react-router-dom'
 import { useRecentSessions } from '../hooks/useSession'
+import { useActiveSession } from '../hooks/useActiveSession'
 import { sessionLabel } from '../types'
 
 export function HistoryPage() {
   const { data: sessions = [], isLoading } = useRecentSessions()
+  const { data: activeSession } = useActiveSession()
   const navigate = useNavigate()
 
-  const completed = sessions.filter((s) => s.ended_at)
+  // Show all sessions except the currently active one
+  const completed = sessions.filter((s) => s.id !== activeSession?.id)
 
   return (
     <div className="space-y-4">
