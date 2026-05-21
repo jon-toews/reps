@@ -238,14 +238,16 @@ function SessionCard({
             <p className="text-xs text-gray-500 mt-1.5 truncate">{exerciseSummary}</p>
           )}
         </button>
-        <button
-          onClick={onUseAsTemplate}
-          disabled={creating}
-          className="text-xs text-gray-500 hover:text-blue-400 disabled:opacity-40 transition-colors shrink-0 mt-0.5"
-          title="Start new session based on this one"
-        >
-          Use as template
-        </button>
+        {session.ended_at && (
+          <button
+            onClick={onUseAsTemplate}
+            disabled={creating}
+            className="text-xs text-gray-500 hover:text-blue-400 disabled:opacity-40 transition-colors shrink-0 mt-0.5"
+            title="Start new session based on this one"
+          >
+            Use as template
+          </button>
+        )}
       </div>
     </div>
   )

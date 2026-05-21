@@ -70,12 +70,30 @@ export function useCreateSession() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) throw new Error('Not authenticated')
 
-      // Auto-close any open sessions
-      await supabase
+      // Auto-close stale empty sessions only. A session with sets is real
+      // work in progress and must never be silently ended — the user keeps
+      // it open and manages it explicitly.
+      const { data: openSessions } = await supabase
         .from('sessions')
-        .update({ ended_at: new Date().toISOString() })
+        .select('id')
         .eq('user_id', user.id)
         .is('ended_at', null)
+
+      if (openSessions && openSessions.length > 0) {
+        const openIds = openSessions.map((s) => s.id)
+        const { data: setRows } = await supabase
+          .from('sets')
+          .select('session_id')
+          .in('session_id', openIds)
+        const nonEmpty = new Set((setRows ?? []).map((r) => r.session_id))
+        const emptyIds = openIds.filter((id) => !nonEmpty.has(id))
+        if (emptyIds.length > 0) {
+          await supabase
+            .from('sessions')
+            .update({ ended_at: new Date().toISOString() })
+            .in('id', emptyIds)
+        }
+      }
 
       const { data: session, error: sessionErr } = await supabase
         .from('sessions')
