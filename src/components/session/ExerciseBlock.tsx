@@ -23,6 +23,8 @@ export interface ExerciseBlockProps {
   sessionCompleted: boolean
   isActive: boolean
   onActivate: () => void
+  onSwap?: () => void
+  isSubstitution?: boolean
   dragHandleProps?: React.HTMLAttributes<HTMLButtonElement>
 }
 
@@ -34,6 +36,8 @@ export function ExerciseBlock({
   sessionCompleted,
   isActive,
   onActivate,
+  onSwap,
+  isSubstitution,
   dragHandleProps,
 }: ExerciseBlockProps) {
   const { data: lastSet } = useLastWeight(exercise.id, gymTag, exercise.is_equipment_dependent)
@@ -96,6 +100,9 @@ export function ExerciseBlock({
             {exercise.is_unilateral && (
               <span className="text-xs text-gray-600">unilateral</span>
             )}
+            {isSubstitution && (
+              <span className="text-xs text-yellow-600">sub</span>
+            )}
             <span className="text-xs text-gray-500">
               {sets.length} set{sets.length !== 1 ? 's' : ''}
             </span>
@@ -110,6 +117,20 @@ export function ExerciseBlock({
             )}
           </div>
         </button>
+
+        {!sessionCompleted && onSwap && (
+          <button
+            type="button"
+            onClick={onSwap}
+            className="p-2 -ml-1 text-gray-600 hover:text-gray-300 transition-colors touch-manipulation"
+            aria-label={`Swap ${exercise.name} for a different exercise`}
+            title="Swap exercise"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4">
+              <path fillRule="evenodd" d="M2.75 5a.75.75 0 0 0 0 1.5h11.69l-1.97 1.97a.75.75 0 1 0 1.06 1.06l3.25-3.25a.75.75 0 0 0 0-1.06l-3.25-3.25a.75.75 0 1 0-1.06 1.06l1.97 1.97H2.75Zm14.5 8.5a.75.75 0 0 0 0-1.5H5.56l1.97-1.97a.75.75 0 1 0-1.06-1.06L3.22 12.22a.75.75 0 0 0 0 1.06l3.25 3.25a.75.75 0 1 0 1.06-1.06L5.56 13.5h11.69Z" clipRule="evenodd" />
+            </svg>
+          </button>
+        )}
 
         <Link
           to={`/exercises/${exercise.id}`}
@@ -181,6 +202,7 @@ export function ExerciseBlock({
               defaultWeight={tentativeWeight}
               defaultReps={tentativeReps}
               defaultTags={tentativeTags}
+              isSubstitution={isSubstitution}
             />
           )}
         </div>

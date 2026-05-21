@@ -78,6 +78,7 @@ export function ActiveSession({ session, onSetSessionActions }: ActiveSessionPro
   const [keyboardHeight, setKeyboardHeight] = useState(0)
 
   const storageKey = `pending_exercises_${session.id}`
+  const subsStorageKey = `subs_${session.id}`
   const [pendingExercises, setPendingExercises] = useState<Exercise[]>(() => {
     try {
       const saved = localStorage.getItem(storageKey)
@@ -86,9 +87,18 @@ export function ActiveSession({ session, onSetSessionActions }: ActiveSessionPro
       return []
     }
   })
+  const [substituteIds, setSubstituteIds] = useState<string[]>(() => {
+    try {
+      const saved = localStorage.getItem(subsStorageKey)
+      return saved ? (JSON.parse(saved) as string[]) : []
+    } catch {
+      return []
+    }
+  })
   const templateInitialized = useRef(pendingExercises.length > 0)
   const [activeExerciseId, setActiveExerciseId] = useState<string | null>(null)
   const [exerciseOrderOverride, setExerciseOrderOverride] = useState<string[] | null>(null)
+  const [swapTargetId, setSwapTargetId] = useState<string | null>(null)
 
   useEffect(() => () => { if (discardTimer.current) clearTimeout(discardTimer.current) }, [])
 
@@ -117,13 +127,27 @@ export function ActiveSession({ session, onSetSessionActions }: ActiveSessionPro
     } catch { /* ignore */ }
   }, [pendingExercises, storageKey])
 
+  useEffect(() => {
+    try {
+      if (substituteIds.length > 0) {
+        localStorage.setItem(subsStorageKey, JSON.stringify(substituteIds))
+      } else {
+        localStorage.removeItem(subsStorageKey)
+      }
+    } catch { /* ignore */ }
+  }, [substituteIds, subsStorageKey])
+
   // Clear exercise order override when server data updates
   useEffect(() => { setExerciseOrderOverride(null) }, [sets])
 
   const handleDiscard = () => {
     if (discardConfirm) {
       if (discardTimer.current) clearTimeout(discardTimer.current)
-      deleteSession.mutate(session.id, { onSuccess: () => { localStorage.removeItem(storageKey); navigate('/') } })
+      deleteSession.mutate(session.id, { onSuccess: () => {
+        localStorage.removeItem(storageKey)
+        localStorage.removeItem(subsStorageKey)
+        navigate('/')
+      } })
     } else {
       setDiscardConfirm(true)
       discardTimer.current = setTimeout(() => setDiscardConfirm(false), 3000)
@@ -190,6 +214,54 @@ export function ActiveSession({ session, onSetSessionActions }: ActiveSessionPro
     setActiveExerciseId(exercise.id)
   }
 
+  const handleOpenSwap = (exerciseId: string) => {
+    setSwapTargetId(exerciseId)
+    setShowPicker(true)
+  }
+
+  const handleSwap = (newExercise: Exercise) => {
+    const oldId = swapTargetId
+    setSwapTargetId(null)
+    setShowPicker(false)
+    if (!oldId || newExercise.id === oldId) return
+
+    const alreadyPresent =
+      derivedExerciseOrder.includes(newExercise.id) ||
+      pendingExercises.some((e) => e.id === newExercise.id)
+    if (alreadyPresent) {
+      setActiveExerciseId(newExercise.id)
+      return
+    }
+
+    const oldHasSets = sets.some((s) => s.exercise_id === oldId)
+    if (oldHasSets) {
+      // Keep original (with its sets) and append the substitute.
+      setPendingExercises((prev) => [...prev, newExercise])
+    } else {
+      // Original was pending only — replace it in place.
+      setPendingExercises((prev) => {
+        const idx = prev.findIndex((e) => e.id === oldId)
+        if (idx < 0) return [...prev, newExercise]
+        const next = [...prev]
+        next[idx] = newExercise
+        return next
+      })
+    }
+
+    setSubstituteIds((prev) => (prev.includes(newExercise.id) ? prev : [...prev, newExercise.id]))
+    setActiveExerciseId(newExercise.id)
+  }
+
+  const handlePickerSelect = (exercise: Exercise) => {
+    if (swapTargetId) handleSwap(exercise)
+    else handleSelectExercise(exercise)
+  }
+
+  const isExerciseSubstitution = (exerciseId: string): boolean => {
+    if (substituteIds.includes(exerciseId)) return true
+    return sets.some((s) => s.exercise_id === exerciseId && s.is_sub)
+  }
+
   useEffect(() => {
     if (templateInitialized.current || allExercises.length === 0) return
     const ids = searchParams.get('exercises')?.split(',').filter(Boolean) ?? []
@@ -210,6 +282,7 @@ export function ActiveSession({ session, onSetSessionActions }: ActiveSessionPro
   const handleFinish = async () => {
     await completeSession.mutateAsync(session.id)
     localStorage.removeItem(storageKey)
+    localStorage.removeItem(subsStorageKey)
     navigate('/history')
   }
 
@@ -387,6 +460,7 @@ export function ActiveSession({ session, onSetSessionActions }: ActiveSessionPro
                   sessionCompleted
                   isActive={false}
                   onActivate={() => {}}
+                  isSubstitution={isExerciseSubstitution(exerciseId)}
                 />
               ) : (
                 <SortableExerciseBlock
@@ -398,6 +472,8 @@ export function ActiveSession({ session, onSetSessionActions }: ActiveSessionPro
                   sessionCompleted={false}
                   isActive={activeId === exerciseId}
                   onActivate={() => setActiveExerciseId(exerciseId)}
+                  onSwap={() => handleOpenSwap(exerciseId)}
+                  isSubstitution={isExerciseSubstitution(exerciseId)}
                 />
               )
             })}
@@ -416,6 +492,8 @@ export function ActiveSession({ session, onSetSessionActions }: ActiveSessionPro
           sessionCompleted={isCompleted}
           isActive={!isCompleted && activeId === exercise.id}
           onActivate={() => setActiveExerciseId(exercise.id)}
+          onSwap={isCompleted ? undefined : () => handleOpenSwap(exercise.id)}
+          isSubstitution={isExerciseSubstitution(exercise.id)}
         />
       ))}
 
@@ -439,9 +517,9 @@ export function ActiveSession({ session, onSetSessionActions }: ActiveSessionPro
 
       {showPicker && (
         <ExercisePicker
-          onSelect={handleSelectExercise}
-          onClose={() => setShowPicker(false)}
-          alreadyAdded={allExerciseIds}
+          onSelect={handlePickerSelect}
+          onClose={() => { setShowPicker(false); setSwapTargetId(null) }}
+          alreadyAdded={swapTargetId ? allExerciseIds.filter((id) => id !== swapTargetId) : allExerciseIds}
         />
       )}
     </div>

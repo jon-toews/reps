@@ -1,31 +1,73 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useRef, useEffect } from 'react'
 import { useDrag } from '@use-gesture/react'
 import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import { useAddSet, useUpdateSet, useDeleteSet, useSessionSets } from '../../hooks/useSession'
-import type { Exercise, SetWithExercise } from '../../types'
+import type { Exercise, SetWithExercise, WorkoutSet } from '../../types'
 
 // ── Stepper Button ────────────────────────────────────────────────────────────
 
+// Single tap = 1 step. Hold = step every 100ms after a 350ms warmup,
+// then every 50ms after 8 repeat ticks for cranking through big jumps.
 function StepBtn({
-  onClick,
+  onStep,
   label,
   children,
 }: {
-  onClick: () => void
+  onStep: () => void
   label: string
   children: React.ReactNode
 }) {
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  const stop = () => {
+    if (intervalRef.current) { clearInterval(intervalRef.current); intervalRef.current = null }
+    if (timeoutRef.current) { clearTimeout(timeoutRef.current); timeoutRef.current = null }
+  }
+
+  useEffect(() => stop, [])
+
+  const start = () => {
+    stop()
+    onStep()
+    timeoutRef.current = setTimeout(() => {
+      let tick = 0
+      intervalRef.current = setInterval(() => {
+        onStep()
+        tick++
+        if (tick === 8 && intervalRef.current) {
+          clearInterval(intervalRef.current)
+          intervalRef.current = setInterval(onStep, 50)
+        }
+      }, 100)
+    }, 350)
+  }
+
   return (
     <button
       type="button"
-      onClick={onClick}
+      onPointerDown={start}
+      onPointerUp={stop}
+      onPointerLeave={stop}
+      onPointerCancel={stop}
       aria-label={label}
       className="w-9 h-9 rounded-full bg-gray-700 hover:bg-gray-600 active:scale-95 flex items-center justify-center text-lg font-light transition-all select-none touch-manipulation shrink-0"
     >
       {children}
     </button>
   )
+}
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+function formatLastSet(set: WorkoutSet, isUnilateral: boolean): string {
+  const w = set.weight != null ? `${set.weight} lb` : '—'
+  const reps = isUnilateral
+    ? `${set.reps_left ?? '—'}/${set.reps_right ?? '—'}`
+    : String(set.reps_left ?? '—')
+  const base = `${w} × ${reps}`
+  return set.rir != null ? `${base} · RIR ${set.rir}` : base
 }
 
 // ── Confirmed Set Row ─────────────────────────────────────────────────────────
@@ -273,6 +315,7 @@ interface TentativeSetRowProps {
   defaultWeight: number | null
   defaultReps: number | null
   defaultTags: string[]
+  isSubstitution?: boolean
 }
 
 export function TentativeSetRow({
@@ -282,6 +325,7 @@ export function TentativeSetRow({
   defaultWeight,
   defaultReps,
   defaultTags,
+  isSubstitution,
 }: TentativeSetRowProps) {
   const addSet = useAddSet()
   const { data: sessionSets = [] } = useSessionSets(sessionId)
@@ -292,9 +336,16 @@ export function TentativeSetRow({
   const [rir, setRir] = useState('')
   const [tags, setTags] = useState(defaultTags.join(', '))
 
-  const weight = userWeight ?? (defaultWeight != null ? String(defaultWeight) : '')
-  const repsLeft = userRepsLeft ?? (defaultReps != null ? String(defaultReps) : '')
-  const repsRight = userRepsRight ?? (defaultReps != null ? String(defaultReps) : '')
+  const weightFallback = defaultWeight != null ? String(defaultWeight) : ''
+  const repsFallback = defaultReps != null ? String(defaultReps) : ''
+  const weight = userWeight ?? weightFallback
+  const repsLeft = userRepsLeft ?? repsFallback
+  const repsRight = userRepsRight ?? repsFallback
+
+  const lastSetForExercise = useMemo(() => {
+    const setsForEx = sessionSets.filter((s) => s.exercise_id === exercise.id)
+    return setsForEx.length > 0 ? setsForEx[setsForEx.length - 1] : null
+  }, [sessionSets, exercise.id])
 
   // Extract recent tags for this exercise from the last N sets
   const recentTags = useMemo(() => {
@@ -327,12 +378,15 @@ export function TentativeSetRow({
 
   const adjust = (
     setter: React.Dispatch<React.SetStateAction<string | null>>,
-    current: string,
+    fallback: string,
     delta: number,
     min = 0
   ) => {
-    const next = Math.max(min, (parseFloat(current) || 0) + delta)
-    setter(next % 1 === 0 ? String(next) : next.toFixed(1))
+    setter((prev) => {
+      const currentVal = prev ?? fallback
+      const next = Math.max(min, (parseFloat(currentVal) || 0) + delta)
+      return next % 1 === 0 ? String(next) : next.toFixed(1)
+    })
   }
 
   const confirm = () => {
@@ -345,7 +399,22 @@ export function TentativeSetRow({
       reps_right: exercise.is_unilateral && repsRight !== '' ? parseInt(repsRight, 10) : null,
       rir: rir !== '' ? parseInt(rir, 10) : null,
       tags: tags.trim().split(/[\s,]+/).filter(Boolean),
-      is_sub: false,
+      is_sub: !!isSubstitution,
+      notes: null,
+    })
+  }
+
+  const repeatLastSet = () => {
+    if (!lastSetForExercise || addSet.isPending) return
+    addSet.mutate({
+      sessionId,
+      exerciseId: exercise.id,
+      weight: lastSetForExercise.weight,
+      reps_left: lastSetForExercise.reps_left,
+      reps_right: lastSetForExercise.reps_right,
+      rir: lastSetForExercise.rir,
+      tags: lastSetForExercise.tags,
+      is_sub: lastSetForExercise.is_sub,
       notes: null,
     })
   }
@@ -356,8 +425,21 @@ export function TentativeSetRow({
 
   return (
     <div className="mt-3 space-y-2">
+      {lastSetForExercise && (
+        <button
+          type="button"
+          onClick={repeatLastSet}
+          disabled={addSet.isPending}
+          className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-xl bg-blue-900/25 hover:bg-blue-900/40 active:bg-blue-900/60 border border-blue-700/30 text-sm text-blue-300 disabled:opacity-50 transition-colors touch-manipulation"
+          aria-label="Repeat last set"
+        >
+          <span className="text-xs text-blue-400/70">Repeat last</span>
+          <span className="font-medium tabular-nums">{formatLastSet(lastSetForExercise, exercise.is_unilateral)}</span>
+        </button>
+      )}
+
       <div className="flex items-center gap-1.5 px-2 py-2 rounded-2xl border border-dashed border-gray-700 bg-gray-900/60 flex-wrap">
-        <StepBtn onClick={() => adjust(setUserWeight, weight, -increment)} label="Decrease weight">−</StepBtn>
+        <StepBtn onStep={() => adjust(setUserWeight, weightFallback, -increment)} label="Decrease weight">−</StepBtn>
         <input
           type="text"
           inputMode="decimal"
@@ -368,13 +450,13 @@ export function TentativeSetRow({
           className="w-14 bg-transparent text-center text-base font-semibold focus:outline-none tabular-nums caret-blue-400 touch-manipulation"
           aria-label="Weight lb"
         />
-        <StepBtn onClick={() => adjust(setUserWeight, weight, increment)} label="Increase weight">+</StepBtn>
+        <StepBtn onStep={() => adjust(setUserWeight, weightFallback, increment)} label="Increase weight">+</StepBtn>
 
         <span className="text-gray-600 text-xs px-0.5 shrink-0">lb ×</span>
 
         {exercise.is_unilateral ? (
           <>
-            <StepBtn onClick={() => adjust(setUserRepsLeft, repsLeft, -1)} label="Decrease reps left">−</StepBtn>
+            <StepBtn onStep={() => adjust(setUserRepsLeft, repsFallback, -1)} label="Decrease reps left">−</StepBtn>
             <input
               type="text"
               inputMode="numeric"
@@ -389,9 +471,9 @@ export function TentativeSetRow({
               aria-label="Reps left"
               autoFocus
             />
-            <StepBtn onClick={() => adjust(setUserRepsLeft, repsLeft, 1)} label="Increase reps left">+</StepBtn>
+            <StepBtn onStep={() => adjust(setUserRepsLeft, repsFallback, 1)} label="Increase reps left">+</StepBtn>
             <span className="text-gray-600 text-xs">/</span>
-            <StepBtn onClick={() => adjust(setUserRepsRight, repsRight, -1)} label="Decrease reps right">−</StepBtn>
+            <StepBtn onStep={() => adjust(setUserRepsRight, repsFallback, -1)} label="Decrease reps right">−</StepBtn>
             <input
               type="text"
               inputMode="numeric"
@@ -402,11 +484,11 @@ export function TentativeSetRow({
               className="w-8 bg-transparent text-center text-base font-semibold focus:outline-none tabular-nums caret-blue-400 touch-manipulation"
               aria-label="Reps right"
             />
-            <StepBtn onClick={() => adjust(setUserRepsRight, repsRight, 1)} label="Increase reps right">+</StepBtn>
+            <StepBtn onStep={() => adjust(setUserRepsRight, repsFallback, 1)} label="Increase reps right">+</StepBtn>
           </>
         ) : (
           <>
-            <StepBtn onClick={() => adjust(setUserRepsLeft, repsLeft, -1)} label="Decrease reps">−</StepBtn>
+            <StepBtn onStep={() => adjust(setUserRepsLeft, repsFallback, -1)} label="Decrease reps">−</StepBtn>
             <input
               type="text"
               inputMode="numeric"
@@ -418,7 +500,7 @@ export function TentativeSetRow({
               aria-label="Reps"
               autoFocus
             />
-            <StepBtn onClick={() => adjust(setUserRepsLeft, repsLeft, 1)} label="Increase reps">+</StepBtn>
+            <StepBtn onStep={() => adjust(setUserRepsLeft, repsFallback, 1)} label="Increase reps">+</StepBtn>
           </>
         )}
 
