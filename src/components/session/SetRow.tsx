@@ -315,6 +315,7 @@ interface TentativeSetRowProps {
   defaultWeight: number | null
   defaultReps: number | null
   defaultTags: string[]
+  dbLastSet: { weight: number | null; reps_left: number | null; reps_right: number | null } | null
   isSubstitution?: boolean
 }
 
@@ -325,6 +326,7 @@ export function TentativeSetRow({
   defaultWeight,
   defaultReps,
   defaultTags,
+  dbLastSet,
   isSubstitution,
 }: TentativeSetRowProps) {
   const addSet = useAddSet()
@@ -376,6 +378,44 @@ export function TentativeSetRow({
 
   const increment = exercise.default_weight_increment || 2.5
 
+  // ── Double progression ─────────────────────────────────────────────────────
+  // Compare the set we'd copy from (the last set this session, else the last set
+  // recorded in the DB) against the exercise's rep target. Reach it → suggest
+  // adding weight. Unilateral exercises use the weaker side as the canonical rep.
+  const repTarget = exercise.rep_target
+
+  const canonicalReps = (left: number | null, right: number | null): number | null => {
+    if (!exercise.is_unilateral) return left
+    const sides = [left, right].filter((n): n is number => n != null)
+    return sides.length > 0 ? Math.min(...sides) : null
+  }
+
+  const progressionSource = lastSetForExercise
+    ? {
+        weight: lastSetForExercise.weight,
+        reps: canonicalReps(lastSetForExercise.reps_left, lastSetForExercise.reps_right),
+      }
+    : dbLastSet
+      ? { weight: dbLastSet.weight, reps: canonicalReps(dbLastSet.reps_left, dbLastSet.reps_right) }
+      : null
+
+  const fmtNum = (n: number) => (n % 1 === 0 ? String(n) : n.toFixed(1))
+
+  const hitTarget =
+    repTarget != null && progressionSource?.reps != null && progressionSource.reps >= repTarget
+  const bumpWeight =
+    progressionSource?.weight != null ? progressionSource.weight + increment : null
+  const repsToGo =
+    repTarget != null && progressionSource?.reps != null
+      ? repTarget - progressionSource.reps
+      : null
+  const showBumpChip =
+    hitTarget && bumpWeight != null && (parseFloat(weight) || 0) < bumpWeight
+
+  const applyBump = () => {
+    if (bumpWeight != null) setUserWeight(fmtNum(bumpWeight))
+  }
+
   const adjust = (
     setter: React.Dispatch<React.SetStateAction<string | null>>,
     fallback: string,
@@ -425,6 +465,27 @@ export function TentativeSetRow({
 
   return (
     <div className="mt-3 space-y-2">
+      {repTarget != null &&
+        (showBumpChip ? (
+          <button
+            type="button"
+            onClick={applyBump}
+            className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-xl bg-green-900/25 hover:bg-green-900/40 active:bg-green-900/60 border border-green-700/30 text-sm text-green-300 transition-colors touch-manipulation"
+            aria-label={`Bump weight to ${fmtNum(bumpWeight!)} pounds`}
+          >
+            <span className="text-xs text-green-400/80">🎯 Hit {repTarget}</span>
+            <span className="font-medium tabular-nums">Bump to {fmtNum(bumpWeight!)} lb</span>
+          </button>
+        ) : (
+          <p className="text-center text-xs text-gray-500 tabular-nums">
+            {hitTarget
+              ? `🎯 ${repTarget}-rep target reached`
+              : progressionSource?.reps != null && progressionSource.weight != null
+                ? `Target ${repTarget} · last ${fmtNum(progressionSource.weight)}×${progressionSource.reps} · ${repsToGo} to go`
+                : `Target ${repTarget} reps`}
+          </p>
+        ))}
+
       {lastSetForExercise && (
         <button
           type="button"

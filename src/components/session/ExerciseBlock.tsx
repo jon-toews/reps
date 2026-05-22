@@ -202,6 +202,7 @@ export function ExerciseBlock({
               defaultWeight={tentativeWeight}
               defaultReps={tentativeReps}
               defaultTags={tentativeTags}
+              dbLastSet={lastSet ?? null}
               isSubstitution={isSubstitution}
             />
           )}

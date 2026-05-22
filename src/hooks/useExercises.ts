@@ -9,6 +9,7 @@ export interface CreateExerciseInput {
   is_equipment_dependent?: boolean
   default_weight_increment?: number
   default_starting_weight?: number | null
+  rep_target?: number | null
   notes?: string | null
 }
 
@@ -42,6 +43,7 @@ export function useCreateExercise() {
           is_equipment_dependent: input.is_equipment_dependent ?? false,
           default_weight_increment: input.default_weight_increment ?? 2.5,
           default_starting_weight: input.default_starting_weight ?? null,
+          rep_target: input.rep_target ?? null,
           notes: input.notes ?? null,
         })
         .select()

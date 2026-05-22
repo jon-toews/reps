@@ -10,6 +10,7 @@ interface FormValues {
   is_equipment_dependent: boolean
   default_weight_increment: number
   default_starting_weight: string
+  rep_target: string
   notes: string
 }
 
@@ -31,6 +32,7 @@ export function ExerciseForm({ exercise, onDone }: ExerciseFormProps) {
       default_starting_weight: exercise?.default_starting_weight != null
         ? String(exercise.default_starting_weight)
         : '',
+      rep_target: exercise?.rep_target != null ? String(exercise.rep_target) : '',
       notes: exercise?.notes ?? '',
     },
   })
@@ -47,6 +49,7 @@ export function ExerciseForm({ exercise, onDone }: ExerciseFormProps) {
       default_starting_weight: values.default_starting_weight !== ''
         ? Number(values.default_starting_weight)
         : null,
+      rep_target: values.rep_target !== '' ? Number(values.rep_target) : null,
       notes: values.notes.trim() || null,
     }
 
@@ -132,6 +135,21 @@ export function ExerciseForm({ exercise, onDone }: ExerciseFormProps) {
             className={inputCls}
           />
         </div>
+      </div>
+
+      <div>
+        <label className={labelCls}>Rep target</label>
+        <input
+          {...register('rep_target')}
+          type="number"
+          step="1"
+          min="1"
+          placeholder="optional"
+          className={inputCls}
+        />
+        <p className="text-xs text-gray-600 mt-1">
+          When a set reaches this rep count, the session screen suggests adding weight.
+        </p>
       </div>
 
       <div>

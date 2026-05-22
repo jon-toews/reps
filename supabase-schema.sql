@@ -30,6 +30,7 @@ create table exercises (
   is_equipment_dependent   boolean not null default false,
   default_weight_increment numeric not null default 2.5,
   default_starting_weight  numeric,
+  rep_target               int,
   notes                    text,
   created_at               timestamptz default now()
 );
@@ -72,3 +73,8 @@ create policy "programs: own rows"  on programs  for all using (auth.uid() = use
 create policy "exercises: own rows" on exercises for all using (auth.uid() = user_id);
 create policy "sessions: own rows"  on sessions  for all using (auth.uid() = user_id);
 create policy "sets: own rows"      on sets      for all using (auth.uid() = user_id);
+
+-- ── Migrations ───────────────────────────────────────────────────────────────
+-- Safe to re-run on an existing database; no-ops once applied. Fresh installs
+-- already get these columns from the create table statements above.
+alter table exercises add column if not exists rep_target int;

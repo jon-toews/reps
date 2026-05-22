@@ -1,9 +1,10 @@
 import { useQuery } from '@tanstack/react-query'
 import { supabase } from '../lib/supabase'
 
-interface LastSetData {
+export interface LastSetData {
   weight: number | null
   reps_left: number | null
+  reps_right: number | null
 }
 
 export function useLastWeight(
@@ -26,7 +27,7 @@ export function useLastWeight(
         if (sessionIds.length > 0) {
           const { data, error } = await supabase
             .from('sets')
-            .select('weight, reps_left')
+            .select('weight, reps_left, reps_right')
             .eq('exercise_id', exerciseId!)
             .in('session_id', sessionIds)
             .order('created_at', { ascending: false })
@@ -41,7 +42,7 @@ export function useLastWeight(
       // Free weights, no gym tag, or equipment-dependent at a new gym: gym-agnostic
       const { data, error } = await supabase
         .from('sets')
-        .select('weight, reps_left')
+        .select('weight, reps_left, reps_right')
         .eq('exercise_id', exerciseId!)
         .order('created_at', { ascending: false })
         .limit(1)

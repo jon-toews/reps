@@ -31,6 +31,7 @@ export interface Exercise {
   is_equipment_dependent: boolean
   default_weight_increment: number
   default_starting_weight: number | null
+  rep_target: number | null
   notes: string | null
   created_at: string
 }
