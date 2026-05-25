@@ -154,6 +154,37 @@ export function AppShell() {
     return () => listener.subscription.unsubscribe()
   }, [navigate])
 
+  // ── Keyboard scroll-into-view ──────────────────────────────────────────────
+  // When the iOS keyboard opens (visualViewport shrinks by >100px), nudge a
+  // focused input/textarea/select into the visible area. block: 'nearest' (not
+  // 'center') avoids fighting the keyboard's own animation by yanking the page;
+  // rAF debounces the resize bursts iOS fires during the keyboard open
+  // transition. iOS scrolls focused inputs natively for normal page scrolls —
+  // this is a safety net for inputs it misses.
+  useEffect(() => {
+    if (!window.visualViewport) return
+    let raf = 0
+    const onResize = () => {
+      cancelAnimationFrame(raf)
+      raf = requestAnimationFrame(() => {
+        const vv = window.visualViewport!
+        if (window.innerHeight - vv.height <= 100) return
+        const el = document.activeElement
+        if (
+          !(el instanceof HTMLInputElement ||
+            el instanceof HTMLTextAreaElement ||
+            el instanceof HTMLSelectElement)
+        ) return
+        el.scrollIntoView({ block: 'nearest' })
+      })
+    }
+    window.visualViewport.addEventListener('resize', onResize)
+    return () => {
+      window.visualViewport!.removeEventListener('resize', onResize)
+      cancelAnimationFrame(raf)
+    }
+  }, [])
+
   const handleSignOut = async () => {
     await supabase.auth.signOut()
   }
