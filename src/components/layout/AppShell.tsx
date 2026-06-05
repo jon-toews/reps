@@ -175,6 +175,14 @@ export function AppShell() {
             el instanceof HTMLTextAreaElement ||
             el instanceof HTMLSelectElement)
         ) return
+        // Skip inputs inside fixed-position containers (e.g. modals) — they
+        // manage their own keyboard avoidance and scrollIntoView would
+        // double-scroll them above the viewport.
+        let ancestor = el.parentElement
+        while (ancestor) {
+          if (getComputedStyle(ancestor).position === 'fixed') return
+          ancestor = ancestor.parentElement
+        }
         el.scrollIntoView({ block: 'nearest' })
       })
     }
