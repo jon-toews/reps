@@ -17,29 +17,38 @@ function NewSessionModal({ onConfirm, onClose, isPending }: NewSessionModalProps
   const { data: programs = [], isLoading: programsLoading } = usePrograms()
   const [selectedProgram, setSelectedProgram] = useState<Program | null>(null)
   const [gymTag, setGymTag] = useState('')
-  const [keyboardHeight, setKeyboardHeight] = useState(0)
+  const [viewport, setViewport] = useState<{ height: number; top: number } | null>(null)
 
+  // Anchor to visualViewport geometry directly rather than deriving an offset
+  // from 100vh/window.innerHeight — on iOS Safari those reflect the layout
+  // viewport, which doesn't shrink when the keyboard opens, so a computed
+  // "100vh - keyboardHeight" can overshoot the actual visible area and push
+  // the sheet's top edge above the screen. visualViewport.height/pageTop are
+  // ground truth for what's actually visible, keyboard included.
   useEffect(() => {
-    if (typeof window === 'undefined' || !('visualViewport' in window)) return
-    const handleResize = () => {
-      const vv = window.visualViewport
-      if (vv) setKeyboardHeight(Math.max(0, window.innerHeight - vv.height))
+    const vv = window.visualViewport
+    if (!vv) return
+    const handleChange = () => setViewport({ height: vv.height, top: vv.offsetTop })
+    handleChange()
+    vv.addEventListener('resize', handleChange)
+    vv.addEventListener('scroll', handleChange)
+    return () => {
+      vv.removeEventListener('resize', handleChange)
+      vv.removeEventListener('scroll', handleChange)
     }
-    handleResize()
-    window.visualViewport?.addEventListener('resize', handleResize)
-    return () => window.visualViewport?.removeEventListener('resize', handleResize)
   }, [])
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
+    <div
+      className="fixed inset-x-0 z-50 flex items-end sm:items-center justify-center"
+      style={{
+        top: viewport ? `${viewport.top}px` : 0,
+        height: viewport ? `${viewport.height}px` : '100vh',
+      }}
+    >
       <div className="absolute inset-0 bg-black/60" onClick={onClose} />
       <div
-        className="relative z-10 w-full max-w-sm bg-gray-900 rounded-t-2xl sm:rounded-2xl border border-gray-800 shadow-2xl p-5 space-y-4"
-        style={{
-          maxHeight: keyboardHeight > 0 ? `calc(100vh - ${keyboardHeight}px - 1rem)` : undefined,
-          marginBottom: keyboardHeight > 0 ? `${keyboardHeight}px` : undefined,
-          overflow: keyboardHeight > 0 ? 'auto' : undefined,
-        }}
+        className="relative z-10 w-full max-w-sm max-h-full overflow-y-auto bg-gray-900 rounded-t-2xl sm:rounded-2xl border border-gray-800 shadow-2xl p-5 space-y-4"
       >
         <h2 className="font-semibold text-base">New Session</h2>
 
