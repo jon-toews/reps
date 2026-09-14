@@ -67,6 +67,45 @@ function canonicalReps(set: HistorySet): number | null {
   return set.reps_left
 }
 
+function repsToken(set: HistorySet, isUnilateral: boolean): string {
+  if (isUnilateral && set.reps_right != null) {
+    return `${set.reps_left ?? '—'}·${set.reps_right}`
+  }
+  return String(set.reps_left ?? '—')
+}
+
+interface SessionGroup {
+  sessionId: string
+  startedAt: string
+  gymTag: string | null
+  summary: string
+  hasSub: boolean
+  tags: string[]
+}
+
+function summarizeSession(sets: HistorySet[], isUnilateral: boolean): string {
+  // Chunk consecutive sets that share the same weight, then condense reps within each chunk.
+  const chunks: { weight: number | null; tokens: string[] }[] = []
+  for (const set of sets) {
+    const token = repsToken(set, isUnilateral)
+    const last = chunks[chunks.length - 1]
+    if (last && last.weight === set.weight) {
+      last.tokens.push(token)
+    } else {
+      chunks.push({ weight: set.weight, tokens: [token] })
+    }
+  }
+
+  return chunks
+    .map(({ weight, tokens }) => {
+      const allSame = tokens.every((t) => t === tokens[0])
+      const repsPart = allSame ? `${tokens.length}×${tokens[0]}` : tokens.join('/')
+      const weightPart = weight != null ? ` @ ${weight} lb` : ''
+      return `${repsPart}${weightPart}`
+    })
+    .join(', ')
+}
+
 export function ExerciseHistoryPage() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
@@ -99,6 +138,35 @@ export function ExerciseHistoryPage() {
   // Trend data: one point per set, chronological
   const weightValues = filtered.map((s) => s.weight).filter((w): w is number => w != null)
   const repsValues = filtered.map((s) => canonicalReps(s)).filter((r): r is number => r != null)
+
+  // Group sets into per-session recaps (filtered is chronological ascending, so
+  // sets for the same session arrive contiguously and groups stay in session order).
+  const sessionGroups = useMemo(() => {
+    const groups: { sessionId: string; startedAt: string; gymTag: string | null; sets: HistorySet[] }[] = []
+    for (const set of filtered) {
+      const last = groups[groups.length - 1]
+      if (last && last.sessionId === set.session.id) {
+        last.sets.push(set)
+      } else {
+        groups.push({
+          sessionId: set.session.id,
+          startedAt: set.session.started_at,
+          gymTag: set.session.gym_tag,
+          sets: [set],
+        })
+      }
+    }
+    return groups.map(
+      (g): SessionGroup => ({
+        sessionId: g.sessionId,
+        startedAt: g.startedAt,
+        gymTag: g.gymTag,
+        summary: summarizeSession(g.sets, !!exercise?.is_unilateral),
+        hasSub: g.sets.some((s) => s.is_sub),
+        tags: Array.from(new Set(g.sets.flatMap((s) => s.tags))),
+      })
+    )
+  }, [filtered, exercise?.is_unilateral])
 
   const pillCls = (active: boolean) =>
     `px-3 py-1 rounded-full text-xs font-medium transition-colors ${
@@ -172,55 +240,32 @@ export function ExerciseHistoryPage() {
         </div>
       )}
 
-      {/* Set list */}
+      {/* Session recap list */}
       {isLoading ? (
         <p className="text-gray-500 text-sm">Loading…</p>
-      ) : filtered.length === 0 ? (
+      ) : sessionGroups.length === 0 ? (
         <p className="text-gray-500 text-sm">No sets recorded yet.</p>
       ) : (
-        <div className="space-y-1">
-          <div className="flex items-center px-3 py-1 text-xs text-gray-600">
-            <span className="w-20">Date</span>
-            <span className="w-16 text-right">Weight</span>
-            <span className="w-16 text-right">Reps</span>
-            <span className="w-12 text-right">RIR</span>
-            <span className="flex-1 text-right">Gym</span>
-          </div>
-          {[...filtered].reverse().map((set) => {
-            const repsDisplay = set.reps_right != null && exercise?.is_unilateral
-              ? `${set.reps_left ?? '—'}/${set.reps_right}`
-              : String(set.reps_left ?? '—')
-            return (
-              <div
-                key={set.id}
-                className="rounded-lg bg-gray-900 border border-gray-800 text-sm"
-              >
-                <div className="flex items-center px-3 py-2.5">
-                  <span className="w-20 text-gray-400 text-xs">{formatDate(set.session.started_at)}</span>
-                  <span className="w-16 text-right tabular-nums">
-                    {set.weight != null ? `${set.weight} lb` : '—'}
-                  </span>
-                  <span className="w-16 text-right tabular-nums">
-                    {repsDisplay}
-                    {set.is_sub && <span className="ml-1 text-xs text-yellow-600">sub</span>}
-                  </span>
-                  <span className="w-12 text-right text-gray-500 tabular-nums text-xs">
-                    {set.rir != null ? set.rir : '—'}
-                  </span>
-                  <span className="flex-1 text-right text-gray-600 text-xs">
-                    {set.session.gym_tag ?? ''}
-                  </span>
-                </div>
-                {set.tags.length > 0 && (
-                  <div className="flex gap-1 px-3 pb-2 flex-wrap">
-                    {set.tags.map((tag) => (
-                      <span key={tag} className="text-xs px-1.5 py-0.5 rounded-full bg-gray-800 text-gray-500">{tag}</span>
-                    ))}
-                  </div>
-                )}
+        <div className="space-y-2">
+          {[...sessionGroups].reverse().map((group) => (
+            <div key={group.sessionId} className="rounded-lg bg-gray-900 border border-gray-800 px-3 py-2.5">
+              <div className="flex items-center justify-between">
+                <span className="text-xs text-gray-400">{formatDate(group.startedAt)}</span>
+                {group.gymTag && <span className="text-xs text-gray-600">{group.gymTag}</span>}
               </div>
-            )
-          })}
+              <p className="text-sm tabular-nums mt-0.5">{group.summary}</p>
+              {(group.hasSub || group.tags.length > 0) && (
+                <div className="flex gap-1 flex-wrap mt-1.5">
+                  {group.hasSub && (
+                    <span className="text-xs px-1.5 py-0.5 rounded-full bg-yellow-900/40 text-yellow-600">sub</span>
+                  )}
+                  {group.tags.map((tag) => (
+                    <span key={tag} className="text-xs px-1.5 py-0.5 rounded-full bg-gray-800 text-gray-500">{tag}</span>
+                  ))}
+                </div>
+              )}
+            </div>
+          ))}
         </div>
       )}
     </div>
