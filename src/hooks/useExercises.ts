@@ -70,8 +70,13 @@ export function useUpdateExercise() {
       if (error) throw error
       return data as Exercise
     },
-    onSuccess: () => {
+    onSuccess: (updated) => {
+      qc.setQueryData<Exercise[]>(['exercises'], (prev) =>
+        prev?.map((e) => (e.id === updated.id ? updated : e))
+      )
       void qc.invalidateQueries({ queryKey: ['exercises'] })
+      // Set rows embed their exercise, so refresh any loaded session.
+      void qc.invalidateQueries({ queryKey: ['sessionSets'] })
     },
   })
 }

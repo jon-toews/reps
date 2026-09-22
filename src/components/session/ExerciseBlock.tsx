@@ -11,8 +11,10 @@ import {
 import type { DragEndEvent } from '@dnd-kit/core'
 import { SortableContext, verticalListSortingStrategy, arrayMove } from '@dnd-kit/sortable'
 import { useLastWeight } from '../../hooks/useLastWeight'
+import { useExercises } from '../../hooks/useExercises'
 import { useReorderSets } from '../../hooks/useSession'
 import { ConfirmedSetRow, SortableSetRow, TentativeSetRow } from './SetRow'
+import { ExerciseConfigSheet } from './ExerciseConfigSheet'
 import type { Exercise, SetWithExercise } from '../../types'
 
 export interface ExerciseBlockProps {
@@ -29,7 +31,7 @@ export interface ExerciseBlockProps {
 }
 
 export function ExerciseBlock({
-  exercise,
+  exercise: exerciseProp,
   sets,
   sessionId,
   gymTag,
@@ -40,6 +42,12 @@ export function ExerciseBlock({
   isSubstitution,
   dragHandleProps,
 }: ExerciseBlockProps) {
+  // The exercise passed in can be stale (joined onto set rows, or snapshotted in
+  // localStorage for pending exercises) — prefer the live copy so config edits
+  // made from the session screen take effect immediately.
+  const { data: allExercises } = useExercises()
+  const exercise = allExercises?.find((e) => e.id === exerciseProp.id) ?? exerciseProp
+  const [showConfig, setShowConfig] = useState(false)
   const { data: lastSet } = useLastWeight(exercise.id, gymTag, exercise.is_equipment_dependent)
   const reorderSets = useReorderSets()
   const [setsOverride, setSetsOverride] = useState<SetWithExercise[] | null>(null)
@@ -132,6 +140,18 @@ export function ExerciseBlock({
           </button>
         )}
 
+        <button
+          type="button"
+          onClick={() => setShowConfig(true)}
+          className="p-2 -ml-1 text-gray-600 hover:text-gray-300 transition-colors touch-manipulation"
+          aria-label={`Configure ${exercise.name}`}
+          title="Exercise config"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4">
+            <path fillRule="evenodd" d="M7.84 1.804A1 1 0 0 1 8.82 1h2.36a1 1 0 0 1 .98.804l.331 1.652a6.993 6.993 0 0 1 1.929 1.115l1.598-.54a1 1 0 0 1 1.186.447l1.18 2.044a1 1 0 0 1-.205 1.251l-1.267 1.113a7.047 7.047 0 0 1 0 2.228l1.267 1.113a1 1 0 0 1 .206 1.25l-1.18 2.045a1 1 0 0 1-1.187.447l-1.598-.54a6.993 6.993 0 0 1-1.929 1.115l-.33 1.652a1 1 0 0 1-.98.804H8.82a1 1 0 0 1-.98-.804l-.331-1.652a6.993 6.993 0 0 1-1.929-1.115l-1.598.54a1 1 0 0 1-1.186-.447l-1.18-2.044a1 1 0 0 1 .205-1.251l1.267-1.114a7.05 7.05 0 0 1 0-2.227L1.821 7.773a1 1 0 0 1-.206-1.25l1.18-2.045a1 1 0 0 1 1.187-.447l1.598.54A6.992 6.992 0 0 1 7.51 3.456l.33-1.652ZM10 13a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z" clipRule="evenodd" />
+          </svg>
+        </button>
+
         <Link
           to={`/exercises/${exercise.id}`}
           state={{ from: `/session/${sessionId}` }}
@@ -207,6 +227,10 @@ export function ExerciseBlock({
             />
           )}
         </div>
+      )}
+
+      {showConfig && (
+        <ExerciseConfigSheet exercise={exercise} onClose={() => setShowConfig(false)} />
       )}
     </div>
   )
